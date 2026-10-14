@@ -25,7 +25,8 @@ docker run -d --name tikv-ci-pd --network host "pingcap/pd:${VERSION}" \
   --advertise-client-urls=http://127.0.0.1:2379 \
   --advertise-peer-urls=http://127.0.0.1:2380 >/dev/null
 
-docker run -d --name tikv-ci-tikv --network host \
+# TiKV refuses to start with fewer than ~82k open file descriptors.
+docker run -d --name tikv-ci-tikv --network host --ulimit nofile=1048576:1048576 \
   -v "$HERE/tikv.toml:/etc/tikv.toml:ro" "pingcap/tikv:${VERSION}" \
   --addr=127.0.0.1:20160 \
   --advertise-addr=127.0.0.1:20160 \

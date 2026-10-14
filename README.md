@@ -8,7 +8,8 @@
 <p align="center">
   <a href="https://github.com/slavabobik/tikv-python/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/slavabobik/tikv-python/actions/workflows/ci.yml/badge.svg"></a>
   <a href="https://pypi.org/project/tikv-python/"><img alt="PyPI" src="https://img.shields.io/pypi/v/tikv-python.svg"></a>
-  <a href="https://pypi.org/project/tikv-python/"><img alt="Python versions" src="https://img.shields.io/pypi/pyversions/tikv-python.svg"></a>
+  <a href="pyproject.toml"><img alt="Python versions" src="https://img.shields.io/badge/dynamic/toml?url=https%3A%2F%2Fraw.githubusercontent.com%2Fslavabobik%2Ftikv-python%2Fmain%2Fpyproject.toml&query=%24.project.requires-python&label=python&color=3776AB"></a>
+  <a href="#compatibility"><img alt="Tested with TiKV 7.5 and 8.5" src="https://img.shields.io/badge/TiKV-7.5%20%7C%208.5-ff5a5f"></a>
   <a href="LICENSE"><img alt="License: Apache 2.0" src="https://img.shields.io/badge/license-Apache%202.0-blue.svg"></a>
 </p>
 
@@ -345,10 +346,10 @@ uv run --with 'grpcio-tools==1.62.3' python scripts/generate_protos.py
 2. Tag and push the release: `git tag v0.2.0 && git push origin v0.2.0`.
 
 The [release workflow](.github/workflows/release.yml) checks that the tag matches
-the version, publishes to TestPyPI and then PyPI with
+the version, publishes to PyPI with
 [trusted publishing](https://docs.pypi.org/trusted-publishers/), and creates a
 GitHub release with the distributions attached. You can also run it by hand from
-the Actions tab to publish to a single registry, optionally under a different
+the Actions tab to publish to TestPyPI or PyPI, optionally under a different
 distribution name; the import name is always `tikv`.
 
 ## License

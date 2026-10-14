@@ -1,8 +1,8 @@
 name: Release
 
-# Pushing a tag like v0.2.0 publishes that version to TestPyPI, then PyPI, and
-# creates a GitHub release. Run it by hand to publish to one registry only,
-# optionally under a different distribution name (the import name stays `tikv`).
+# Pushing a tag like v0.2.0 publishes that version to PyPI and creates a GitHub
+# release. Run it by hand to publish to TestPyPI or PyPI, optionally under a
+# different distribution name (the import name stays `tikv`).
 on:
   push:
     tags: ["v*"]
@@ -67,7 +67,7 @@ jobs:
   testpypi:
     name: Publish to TestPyPI
     needs: build
-    if: github.ref_type == 'tag' || inputs.registry == 'testpypi'
+    if: github.ref_type != 'tag' && inputs.registry == 'testpypi'
     runs-on: ubuntu-latest
     environment:
       name: testpypi
@@ -86,11 +86,8 @@ jobs:
 
   pypi:
     name: Publish to PyPI
-    needs: [build, testpypi]
-    # On tags, only after TestPyPI succeeded; by hand, when PyPI was chosen.
-    if: >-
-      always() && needs.build.result == 'success' &&
-      ((github.ref_type == 'tag' && needs.testpypi.result == 'success') || inputs.registry == 'pypi')
+    needs: build
+    if: github.ref_type == 'tag' || inputs.registry == 'pypi'
     runs-on: ubuntu-latest
     environment:
       name: pypi

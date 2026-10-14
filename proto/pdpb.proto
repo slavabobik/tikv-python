@@ -1,0 +1,114 @@
+// Subset of pingcap/kvproto `pdpb.proto` used by the raw client.
+//
+// Package, message names and field numbers MUST stay identical to upstream:
+// they define the wire format. Fields the client never reads are omitted;
+// protobuf keeps them as unknown fields, so nothing is lost on the wire.
+// Upstream: https://github.com/pingcap/kvproto/blob/master/proto/pdpb.proto
+
+syntax = "proto3";
+package pdpb;
+
+import "metapb.proto";
+
+service PD {
+  rpc GetMembers(GetMembersRequest) returns (GetMembersResponse) {}
+  rpc GetStore(GetStoreRequest) returns (GetStoreResponse) {}
+  rpc GetRegion(GetRegionRequest) returns (GetRegionResponse) {}
+  rpc GetPrevRegion(GetRegionRequest) returns (GetRegionResponse) {}
+  rpc ScanRegions(ScanRegionsRequest) returns (ScanRegionsResponse) {}
+}
+
+message RequestHeader {
+  // cluster_id is the ID of the cluster which be sent to.
+  uint64 cluster_id = 1;
+  uint64 sender_id = 2;
+  // caller_id is the ID of the caller, used for metrics and diagnostics.
+  string caller_id = 3;
+  string caller_component = 4;
+}
+
+message ResponseHeader {
+  uint64 cluster_id = 1;
+  Error error = 2;
+}
+
+enum ErrorType {
+  OK = 0;
+  UNKNOWN = 1;
+  NOT_BOOTSTRAPPED = 2;
+  STORE_TOMBSTONE = 3;
+  ALREADY_BOOTSTRAPPED = 4;
+  INCOMPATIBLE_VERSION = 5;
+  REGION_NOT_FOUND = 6;
+  GLOBAL_CONFIG_NOT_FOUND = 7;
+  DUPLICATED_ENTRY = 8;
+  ENTRY_NOT_FOUND = 9;
+  INVALID_VALUE = 10;
+  DATA_COMPACTED = 11;
+  REGIONS_NOT_CONTAIN_ALL_KEY_RANGE = 12;
+}
+
+message Error {
+  ErrorType type = 1;
+  string message = 2;
+}
+
+message Member {
+  string name = 1;
+  uint64 member_id = 2;
+  repeated string peer_urls = 3;
+  repeated string client_urls = 4;
+}
+
+message GetMembersRequest {
+  RequestHeader header = 1;
+}
+
+message GetMembersResponse {
+  ResponseHeader header = 1;
+  repeated Member members = 2;
+  Member leader = 3;
+}
+
+message GetStoreRequest {
+  RequestHeader header = 1;
+  uint64 store_id = 2;
+}
+
+message GetStoreResponse {
+  ResponseHeader header = 1;
+  metapb.Store store = 2;
+}
+
+message GetRegionRequest {
+  RequestHeader header = 1;
+  bytes region_key = 2;
+}
+
+message GetRegionResponse {
+  ResponseHeader header = 1;
+  metapb.Region region = 2;
+  metapb.Peer leader = 3;
+}
+
+message ScanRegionsRequest {
+  RequestHeader header = 1;
+  bytes start_key = 2;
+  // No limit when limit <= 0.
+  int32 limit = 3;
+  // end_key is +inf when it is empty.
+  bytes end_key = 4;
+}
+
+message Region {
+  metapb.Region region = 1;
+  metapb.Peer leader = 2;
+}
+
+message ScanRegionsResponse {
+  ResponseHeader header = 1;
+  // Deprecated upstream in favour of `regions`, but still populated.
+  repeated metapb.Region region_metas = 2;
+  repeated metapb.Peer leaders = 3;
+  repeated Region regions = 4;
+}

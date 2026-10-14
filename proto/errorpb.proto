@@ -1,0 +1,131 @@
+// Subset of pingcap/kvproto `errorpb.proto` used by the raw client.
+//
+// Package, message names and field numbers MUST stay identical to upstream:
+// they define the wire format. Fields the client never reads are omitted;
+// protobuf keeps them as unknown fields, so nothing is lost on the wire.
+// Upstream: https://github.com/pingcap/kvproto/blob/master/proto/errorpb.proto
+
+syntax = "proto3";
+package errorpb;
+
+import "metapb.proto";
+
+message NotLeader {
+  uint64 region_id = 1;
+  // The leader of the region, if known.
+  metapb.Peer leader = 2;
+}
+
+message IsWitness {
+  uint64 region_id = 1;
+}
+
+message DiskFull {
+  repeated uint64 store_id = 1;
+  string reason = 2;
+}
+
+message StoreNotMatch {
+  uint64 request_store_id = 1;
+  uint64 actual_store_id = 2;
+}
+
+message RegionNotFound {
+  uint64 region_id = 1;
+}
+
+message RegionNotInitialized {
+  uint64 region_id = 1;
+}
+
+message KeyNotInRegion {
+  bytes key = 1;
+  uint64 region_id = 2;
+  bytes start_key = 3;
+  bytes end_key = 4;
+}
+
+message EpochNotMatch {
+  // Regions that cover the requested range, as known by the store.
+  repeated metapb.Region current_regions = 1;
+}
+
+message ServerIsBusy {
+  string reason = 1;
+  // How long the client should back off, as suggested by the server.
+  uint64 backoff_ms = 2;
+  uint32 estimated_wait_ms = 3;
+  uint64 applied_index = 4;
+}
+
+message StaleCommand {}
+
+message RaftEntryTooLarge {
+  uint64 region_id = 1;
+  uint64 entry_size = 2;
+}
+
+message MaxTimestampNotSynced {}
+
+message ReadIndexNotReady {
+  string reason = 1;
+  uint64 region_id = 2;
+}
+
+message ProposalInMergingMode {
+  uint64 region_id = 1;
+}
+
+message DataIsNotReady {
+  uint64 region_id = 1;
+  uint64 peer_id = 2;
+  uint64 safe_ts = 3;
+}
+
+message RecoveryInProgress {
+  uint64 region_id = 1;
+}
+
+message FlashbackInProgress {
+  uint64 region_id = 1;
+  uint64 flashback_start_ts = 2;
+}
+
+message FlashbackNotPrepared {
+  uint64 region_id = 1;
+}
+
+message MismatchPeerId {
+  uint64 request_peer_id = 1;
+  uint64 store_peer_id = 2;
+}
+
+message UndeterminedResult {
+  string message = 1;
+}
+
+// Error is a region error: the request could not be served by the targeted
+// region peer. At most one of the specific fields is set.
+message Error {
+  string message = 1;
+  NotLeader not_leader = 2;
+  RegionNotFound region_not_found = 3;
+  KeyNotInRegion key_not_in_region = 4;
+  EpochNotMatch epoch_not_match = 5;
+  ServerIsBusy server_is_busy = 6;
+  StaleCommand stale_command = 7;
+  StoreNotMatch store_not_match = 8;
+  RaftEntryTooLarge raft_entry_too_large = 9;
+  MaxTimestampNotSynced max_timestamp_not_synced = 10;
+  ReadIndexNotReady read_index_not_ready = 11;
+  ProposalInMergingMode proposal_in_merging_mode = 12;
+  DataIsNotReady data_is_not_ready = 13;
+  RegionNotInitialized region_not_initialized = 14;
+  DiskFull disk_full = 15;
+  RecoveryInProgress RecoveryInProgress = 16;
+  FlashbackInProgress FlashbackInProgress = 17;
+  FlashbackNotPrepared FlashbackNotPrepared = 18;
+  IsWitness is_witness = 19;
+  MismatchPeerId mismatch_peer_id = 20;
+  UndeterminedResult undetermined_result = 22;
+}

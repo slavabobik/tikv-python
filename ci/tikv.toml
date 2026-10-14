@@ -1,0 +1,11 @@
+# TiKV settings for the single-node CI cluster.
+
+[storage]
+# RawKV with TTL support, the configuration the integration tests expect.
+api-version = 1
+enable-ttl = true
+# CI runners have little free disk; do not hold space back.
+reserve-space = "0MB"
+
+[storage.block-cache]
+capacity = "256MB"

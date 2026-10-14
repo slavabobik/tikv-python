@@ -1,0 +1,121 @@
+name: Release
+
+# Pushing a tag like v0.2.0 publishes that version to TestPyPI, then PyPI, and
+# creates a GitHub release. Run it by hand to publish to one registry only,
+# optionally under a different distribution name (the import name stays `tikv`).
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      registry:
+        description: Registry to publish to
+        type: choice
+        options: [testpypi, pypi]
+        default: testpypi
+      package-name:
+        description: Distribution name (leave empty to use the one in pyproject.toml)
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build distributions
+    runs-on: ubuntu-latest
+    outputs:
+      name: ${{ steps.meta.outputs.name }}
+      version: ${{ steps.meta.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
+
+      - name: Use a different distribution name
+        if: inputs.package-name != ''
+        env:
+          NAME: ${{ inputs.package-name }}
+        run: sed -i -E "s/^name = \".*\"$/name = \"${NAME}\"/" pyproject.toml
+
+      - name: Read package metadata
+        id: meta
+        run: |
+          name=$(sed -n -E 's/^name = "(.*)"$/\1/p' pyproject.toml)
+          version=$(sed -n -E 's/^__version__ = "(.*)"$/\1/p' src/tikv/__init__.py)
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Publishing $name $version"
+
+      - name: Tag matches the package version
+        if: github.ref_type == 'tag'
+        env:
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          if [ "${GITHUB_REF_NAME}" != "v${VERSION}" ]; then
+            echo "::error::tag ${GITHUB_REF_NAME} does not match __version__ ${VERSION}"
+            exit 1
+          fi
+
+      - run: uv build
+      - run: uvx twine check --strict dist/*
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: dist/
+
+  testpypi:
+    name: Publish to TestPyPI
+    needs: build
+    if: github.ref_type == 'tag' || inputs.registry == 'testpypi'
+    runs-on: ubuntu-latest
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/project/${{ needs.build.outputs.name }}/${{ needs.build.outputs.version }}/
+    permissions:
+      id-token: write # trusted publishing
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          skip-existing: true
+
+  pypi:
+    name: Publish to PyPI
+    needs: [build, testpypi]
+    # On tags, only after TestPyPI succeeded; by hand, when PyPI was chosen.
+    if: >-
+      always() && needs.build.result == 'success' &&
+      ((github.ref_type == 'tag' && needs.testpypi.result == 'success') || inputs.registry == 'pypi')
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/${{ needs.build.outputs.name }}/${{ needs.build.outputs.version }}/
+    permissions:
+      id-token: write # trusted publishing
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
+
+  github-release:
+    name: GitHub release
+    needs: [build, pypi]
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist/
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --title "$GITHUB_REF_NAME" --generate-notes

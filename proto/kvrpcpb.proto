@@ -1,0 +1,232 @@
+// Subset of pingcap/kvproto `kvrpcpb.proto` used by the raw client.
+//
+// Package, message names and field numbers MUST stay identical to upstream:
+// they define the wire format. Fields the client never reads are omitted;
+// protobuf keeps them as unknown fields, so nothing is lost on the wire.
+// Upstream: https://github.com/pingcap/kvproto/blob/master/proto/kvrpcpb.proto
+//
+// The RPCs live in service `tikvpb.Tikv` (see tikvpb.proto upstream):
+//
+//   rpc RawGet(RawGetRequest) returns (RawGetResponse);
+//   rpc RawBatchGet(RawBatchGetRequest) returns (RawBatchGetResponse);
+//   rpc RawPut(RawPutRequest) returns (RawPutResponse);
+//   rpc RawBatchPut(RawBatchPutRequest) returns (RawBatchPutResponse);
+//   rpc RawDelete(RawDeleteRequest) returns (RawDeleteResponse);
+//   rpc RawBatchDelete(RawBatchDeleteRequest) returns (RawBatchDeleteResponse);
+//   rpc RawScan(RawScanRequest) returns (RawScanResponse);
+//   rpc RawDeleteRange(RawDeleteRangeRequest) returns (RawDeleteRangeResponse);
+//   rpc RawGetKeyTTL(RawGetKeyTTLRequest) returns (RawGetKeyTTLResponse);
+//   rpc RawCompareAndSwap(RawCASRequest) returns (RawCASResponse);
+//   rpc RawChecksum(RawChecksumRequest) returns (RawChecksumResponse);
+
+syntax = "proto3";
+package kvrpcpb;
+
+import "errorpb.proto";
+import "metapb.proto";
+
+enum APIVersion {
+  // RawKV and TxnKV share the key space with TiDB; no TTL.
+  V1 = 0;
+  // RawKV only, with TTL. Clients still send `V1` to such servers.
+  V1TTL = 1;
+  // Keys are prefixed with a mode byte and a 3-byte keyspace id.
+  V2 = 2;
+  V3 = 3;
+}
+
+enum CommandPri {
+  Normal = 0;
+  Low = 1;
+  High = 2;
+}
+
+// Miscellaneous metadata attached to every request.
+message Context {
+  uint64 region_id = 1;
+  metapb.RegionEpoch region_epoch = 2;
+  metapb.Peer peer = 3;
+  uint64 term = 5;
+  CommandPri priority = 6;
+  bool not_fill_cache = 8;
+  uint64 max_execution_duration_ms = 14;
+  bool is_retry_request = 20;
+  APIVersion api_version = 21;
+  string request_source = 24;
+  string keyspace_name = 31;
+  // Upstream declares this inside `oneof keyspace`, which is wire-compatible.
+  uint32 keyspace_id = 32;
+  uint64 cluster_id = 35;
+}
+
+message KeyError {
+  string retryable = 2;
+  string abort = 3;
+}
+
+message KvPair {
+  KeyError error = 1;
+  bytes key = 2;
+  bytes value = 3;
+}
+
+message KeyRange {
+  bytes start_key = 1;
+  bytes end_key = 2;
+}
+
+message RawGetRequest {
+  Context context = 1;
+  bytes key = 2;
+  string cf = 3;
+}
+
+message RawGetResponse {
+  errorpb.Error region_error = 1;
+  string error = 2;
+  bytes value = 3;
+  bool not_found = 4;
+}
+
+message RawBatchGetRequest {
+  Context context = 1;
+  repeated bytes keys = 2;
+  string cf = 3;
+}
+
+message RawBatchGetResponse {
+  errorpb.Error region_error = 1;
+  // Only the keys that exist are returned.
+  repeated KvPair pairs = 2;
+}
+
+message RawPutRequest {
+  Context context = 1;
+  bytes key = 2;
+  bytes value = 3;
+  string cf = 4;
+  uint64 ttl = 5;
+  bool for_cas = 6;
+}
+
+message RawPutResponse {
+  errorpb.Error region_error = 1;
+  string error = 2;
+}
+
+message RawBatchPutRequest {
+  Context context = 1;
+  repeated KvPair pairs = 2;
+  string cf = 3;
+  bool for_cas = 5;
+  // TTL in seconds for each key. A single entry applies to all keys.
+  repeated uint64 ttls = 6;
+}
+
+message RawBatchPutResponse {
+  errorpb.Error region_error = 1;
+  string error = 2;
+}
+
+message RawDeleteRequest {
+  Context context = 1;
+  bytes key = 2;
+  string cf = 3;
+  bool for_cas = 4;
+}
+
+message RawDeleteResponse {
+  errorpb.Error region_error = 1;
+  string error = 2;
+}
+
+message RawBatchDeleteRequest {
+  Context context = 1;
+  repeated bytes keys = 2;
+  string cf = 3;
+  bool for_cas = 4;
+}
+
+message RawBatchDeleteResponse {
+  errorpb.Error region_error = 1;
+  string error = 2;
+}
+
+message RawScanRequest {
+  Context context = 1;
+  bytes start_key = 2;
+  uint32 limit = 3;
+  bool key_only = 4;
+  string cf = 5;
+  bool reverse = 6;
+  // Forward scans read [start_key, end_key); reverse scans read
+  // [end_key, start_key) in descending order.
+  bytes end_key = 7;
+}
+
+message RawScanResponse {
+  errorpb.Error region_error = 1;
+  repeated KvPair kvs = 2;
+}
+
+message RawDeleteRangeRequest {
+  Context context = 1;
+  bytes start_key = 2;
+  bytes end_key = 3;
+  string cf = 4;
+}
+
+message RawDeleteRangeResponse {
+  errorpb.Error region_error = 1;
+  string error = 2;
+}
+
+message RawGetKeyTTLRequest {
+  Context context = 1;
+  bytes key = 2;
+  string cf = 3;
+}
+
+message RawGetKeyTTLResponse {
+  errorpb.Error region_error = 1;
+  string error = 2;
+  uint64 ttl = 3;
+  bool not_found = 4;
+}
+
+message RawCASRequest {
+  Context context = 1;
+  bytes key = 2;
+  bytes value = 3;
+  bool previous_not_exist = 4;
+  bytes previous_value = 5;
+  string cf = 6;
+  uint64 ttl = 7;
+}
+
+message RawCASResponse {
+  errorpb.Error region_error = 1;
+  string error = 2;
+  bool succeed = 3;
+  // The previous value, whether or not the swap succeeded.
+  bool previous_not_exist = 4;
+  bytes previous_value = 5;
+}
+
+enum ChecksumAlgorithm {
+  Crc64_Xor = 0;
+}
+
+message RawChecksumRequest {
+  Context context = 1;
+  ChecksumAlgorithm algorithm = 2;
+  repeated KeyRange ranges = 3;
+}
+
+message RawChecksumResponse {
+  errorpb.Error region_error = 1;
+  string error = 2;
+  uint64 checksum = 3;
+  uint64 total_kvs = 4;
+  uint64 total_bytes = 5;
+}
